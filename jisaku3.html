@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>給与計算アプリ</title>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        .input-form, .calendar-view, .result-view {
+            display: none;
+        }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-gap: 5px;
+        }
+        .day {
+            width: 100%;
+            height: 100px;
+            text-align: center;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .day:hover {
+            background-color: #e2e6ea;
+        }
+        .selected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .holiday {
+            background-color: #FFD700;
+            color: white;
+        }
+        .holiday.selected {
+            background-color: #FF8C00;
+        }
+        .tooltip {
+            display: none;
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            z-index: 1000;
+            pointer-events: auto;
+        }
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 10px;
+        }
+        .calendar-header div {
+            text-align: center;
+            font-weight: bold;
+        }
+        .result-view {
+            font-family: Arial, sans-serif;
+        }
+        .result-view h1 {
+            font-size: 2em;
+            color: #333;
+        }
+        .result-view .monthly-total, .result-view .daily-details {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-radius: 8px;
+        }
+        .result-view .daily-details {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-form" style="display: block;">
+            <h2>初期設定</h2>
+            <div class="form-group">
+                <label for="hourlyWage">時給:</label>
+                <input type="number" class="form-control" id="hourlyWage">
+            </div>
+            <div class="form-group">
+                <label for="dailyTransportCost">1日の交通費:</label>
+                <input type="number" class="form-control" id="dailyTransportCost">
+            </div>
+            <div class="form-group">
+                <label for="holidayBonusAmount">祝日の自給アップ金額:</label>
+                <input type="number" class="form-control" id="holidayBonusAmount">
+            </div>
+            <button class="btn btn-primary" onclick="nextToCalendar()">次へ</button>
+        </div>
+
+        <div class="calendar-view">
+            <h2>日付選択</h2>
+            <div class="form-group">
+                <label for="yearSelect">年を選択:</label>
+                <select class="form-control" id="yearSelect" onchange="generateCalendar()"></select>
+            </div>
+            <div class="form-group">
+                <label for="monthSelect">月を選択:</label>
+                <select class="form-control" id="monthSelect" onchange="generateCalendar()">
+                    <option value="0">1月</option>
+                    <option value="1">2月</option>
+                    <option value="2">3月</option>
+                    <option value="3">4月</option>
+                    <option value="4">5月</option>
+                    <option value="5">6月</option>
+                    <option value="6">7月</option>
+                    <option value="7">8月</option>
+                    <option value="8">9月</option>
+                    <option value="9">10月</option>
+                    <option value="10">11月</option>
+                    <option value="11">12月</option>
+                </select>
+            </div>
+            <div class="calendar-header">
+                <div>日</div>
+                <div>月</div>
+                <div>火</div>
+                <div>水</div>
+                <div>木</div>
+                <div>金</div>
+                <div>土</div>
+            </div>
+            <div id="calendar" class="calendar"></div>
+            <div id="monthlyTotal" class="mt-3"></div>
+            <div class="buttons mt-3">
+                <button class="btn btn-success" onclick="calculateSalary()">計算</button>
+                <button class="btn btn-secondary" onclick="backToInputForm()">初期設定に戻る</button>
+            </div>
+        </div>
+
+        <div class="result-view">
+            <h1 id="totalSalary">総支給額: ¥0</h1>
+            <div id="monthlyTotals" class="monthly-total"></div>
+            <div id="resultDetails" class="daily-details"></div>
+            <button class="btn btn-secondary" onclick="resetAll()">初期設定に戻る</button>
+        </div>
+
+        <div id="tooltip" class="tooltip">
+            <h3>勤務時間と祝日選択</h3>
+            <div class="form-group">
+                <label for="workHours">勤務時間:</label>
+                <input type="number" class="form-control" id="workHours">
+            </div>
+            <button class="btn btn-primary" onclick="saveDate()">保存</button>
+            <button class="btn btn-secondary" onclick="hideTooltip()">戻る</button>
+        </div>
+    </div>
+
+    <script>
+        let hourlyWage;
+        let dailyTransportCost;
+        let holidayBonusAmount;
+        let selectedDates = {};
+        let currentSelectedDate;
+        const holidays = {
+            '2024-01-01': true,
+            '2024-01-14': true,
+            '2024-02-11': true,
+            '2024-02-23': true,
+            '2024-03-21': true,
+            '2024-04-29': true,
+            '2024-05-03': true,
+            '2024-05-04': true,
+            '2024-05-05': true,
+            '2024-07-15': true,
+            '2024-08-11': true,
+            '2024-09-16': true,
+            '2024-09-23': true,
+            '2024-10-14': true,
+            '2024-11-03': true,
+            '2024-11-23': true,
+            '2024-12-23': true,
+        };
+
+        function nextToCalendar() {
+            hourlyWage = parseFloat(document.getElementById('hourlyWage').value);
+            dailyTransportCost = parseFloat(document.getElementById('dailyTransportCost').value);
+            holidayBonusAmount = parseFloat(document.getElementById('holidayBonusAmount').value);
+
+            if (isNaN(hourlyWage) || isNaN(dailyTransportCost) || isNaN(holidayBonusAmount)) {
+                alert('時給、1日の交通費、および祝日の自給アップ金額を数値で入力してください。');
+                return;
+            }
+
+            document.querySelector('.input-form').style.display = 'none';
+            document.querySelector('.calendar-view').style.display = 'block';
+            populateYearSelect();
+            generateCalendar();
+        }
+
+        function backToInputForm() {
+            document.querySelector('.input-form').style.display = 'block';
+            document.querySelector('.calendar-view').style.display = 'none';
+            document.querySelector('.result-view').style.display = 'none';
+        }
+
+        function populateYearSelect() {
+            let yearSelect = document.getElementById('yearSelect');
+            let currentYear = new Date().getFullYear();
+            yearSelect.innerHTML = '';
+            for (let i = -1; i <= 1; i++) {
+                let yearOption = document.createElement('option');
+                yearOption.value = currentYear + i;
+                yearOption.textContent = currentYear + i;
+                yearSelect.appendChild(yearOption);
+            }
+            yearSelect.value = currentYear;
+        }
+
+        function generateCalendar() {
+            const calendar = document.getElementById('calendar');
+            const monthSelect = document.getElementById('monthSelect');
+            const yearSelect = document.getElementById('yearSelect');
+            const month = parseInt(monthSelect.value);
+            const year = parseInt(yearSelect.value);
+
+            let firstDay = new Date(year, month, 1).getDay();
+            let daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            calendar.innerHTML = '';
+
+            for (let i = 0; i < firstDay; i++) {
+                let emptyDay = document.createElement('div');
+                emptyDay.classList.add('day');
+                calendar.appendChild(emptyDay);
+            }
+
+            for (let date = 1; date <= daysInMonth; date++) {
+                let day = document.createElement('div');
+                day.classList.add('day');
+                day.textContent = date;
+                day.dataset.date = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+
+                if (holidays[day.dataset.date]) {
+                    day.classList.add('holiday');
+                }
+
+                if (selectedDates[day.dataset.date]) {
+                    day.classList.add('selected');
+                }
+
+                day.addEventListener('click', function() {
+                    currentSelectedDate = this.dataset.date;
+                    if (selectedDates[currentSelectedDate]) {
+                        delete selectedDates[currentSelectedDate];
+                        this.classList.remove('selected');
+                    } else {
+                        showTooltip(this);
+                    }
+                });
+
+                calendar.appendChild(day);
+            }
+        }
+
+        function showTooltip(dayElement) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.style.display = 'block';
+            tooltip.style.top = `${dayElement.offsetTop + dayElement.offsetHeight}px`;
+            tooltip.style.left = `${dayElement.offsetLeft}px`;
+
+            document.getElementById('workHours').value = '';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').style.display = 'none';
+        }
+
+        function saveDate() {
+            const workHours = parseFloat(document.getElementById('workHours').value);
+
+            if (isNaN(workHours)) {
+                alert('勤務時間を正しく入力してください。');
+                return;
+            }
+
+            selectedDates[currentSelectedDate] = {
+                workHours: workHours,
+                holiday: holidays[currentSelectedDate] || false
+            };
+
+            const dayElements = document.querySelectorAll('.day');
+            dayElements.forEach(day => {
+                if (day.dataset.date === currentSelectedDate) {
+                    day.classList.add('selected');
+                }
+            });
+
+            hideTooltip();
+        }
+
+        function calculateSalary() {
+            let totalSalary = 0;
+            let monthlyTotals = {};
+            let resultDetails = '';
+
+            for (const [date, details] of Object.entries(selectedDates)) {
+                const dateObj = new Date(date);
+                const monthYear = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                const dailySalary = hourlyWage * details.workHours;
+                const transportCost = dailyTransportCost;
+                const holidayBonus = details.holiday ? (holidayBonusAmount * details.workHours) : 0;
+                const totalDailySalary = dailySalary + transportCost + holidayBonus;
+                totalSalary += totalDailySalary;
+
+                if (!monthlyTotals[monthYear]) {
+                    monthlyTotals[monthYear] = 0;
+                }
+                monthlyTotals[monthYear] += totalDailySalary;
+
+                resultDetails += `<p><strong>${date}:</strong> 基本給 ¥${Math.floor(dailySalary)} + 交通費 ¥${Math.floor(transportCost)} + 祝日ボーナス ¥${Math.floor(holidayBonus)} = 合計 ¥${Math.floor(totalDailySalary)}</p>`;
+            }
+
+            document.getElementById('totalSalary').textContent = `総支給額: ¥${Math.floor(totalSalary)}`;
+
+            const monthlyTotalsContainer = document.getElementById('monthlyTotals');
+            monthlyTotalsContainer.innerHTML = '';
+            for (const [monthYear, total] of Object.entries(monthlyTotals)) {
+                monthlyTotalsContainer.innerHTML += `<p><strong>${monthYear}:</strong> ¥${Math.floor(total)}</p>`;
+            }
+
+            const resultDetailsContainer = document.getElementById('resultDetails');
+            resultDetailsContainer.innerHTML = resultDetails;
+
+            document.querySelector('.calendar-view').style.display = 'none';
+            document.querySelector('.result-view').style.display = 'block';
+        }
+
+        function resetAll() {
+            document.querySelector('.result-view').style.display = 'none';
+            document.querySelector('.calendar-view').style.display = 'none';
+            document.querySelector('.input-form').style.display = 'block';
+            
+            hourlyWage = null;
+            dailyTransportCost = null;
+            holidayBonusAmount = null;
+            selectedDates = {};
+            currentSelectedDate = null;
+            document.getElementById('hourlyWage').value = '';
+            document.getElementById('dailyTransportCost').value = '';
+            document.getElementById('holidayBonusAmount').value = '';
+            document.getElementById('yearSelect').value = new Date().getFullYear();
+            document.getElementById('monthSelect').value = 0;
+        }
+    </script>
+</body>
+</html>
