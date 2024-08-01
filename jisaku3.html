@@ -17,7 +17,7 @@
             border-radius: 8px;
             box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
         }
-        .input-form, .calendar-view, .result-view {
+        .input-form, .calendar-view, .result-view, .exit-message {
             display: none;
         }
         .calendar {
@@ -87,6 +87,34 @@
         .result-view .daily-details {
             font-size: 0.9em;
         }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-primary {
+            background-color: #007bff;
+        }
+        .btn-success {
+            background-color: #28a745;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        .exit-message {
+            text-align: center;
+            font-size: 1.5em;
+            color: #333;
+            padding: 20px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            background-color: #f1f1f1;
+        }
     </style>
 </head>
 <body>
@@ -152,7 +180,10 @@
             <h1 id="totalSalary">総支給額: ¥0</h1>
             <div id="monthlyTotals" class="monthly-total"></div>
             <div id="resultDetails" class="daily-details"></div>
-            <button class="btn btn-secondary" onclick="resetAll()">初期設定に戻る</button>
+            <div class="buttons mt-3">
+                <button class="btn btn-secondary" onclick="resetAll()">初期設定に戻る</button>
+                <button class="btn btn-primary" onclick="endApp()">終了</button>
+            </div>
         </div>
 
         <div id="tooltip" class="tooltip">
@@ -163,6 +194,10 @@
             </div>
             <button class="btn btn-primary" onclick="saveDate()">保存</button>
             <button class="btn btn-secondary" onclick="hideTooltip()">戻る</button>
+        </div>
+
+        <div class="exit-message" id="exitMessage">
+            アプリを終了しました
         </div>
     </div>
 
@@ -198,31 +233,26 @@
             holidayBonusAmount = parseFloat(document.getElementById('holidayBonusAmount').value);
 
             if (isNaN(hourlyWage) || isNaN(dailyTransportCost) || isNaN(holidayBonusAmount)) {
-                alert('時給、1日の交通費、および祝日の自給アップ金額を数値で入力してください。');
+                alert('すべての値を正しく入力してください。');
                 return;
             }
 
             document.querySelector('.input-form').style.display = 'none';
             document.querySelector('.calendar-view').style.display = 'block';
-            populateYearSelect();
+
+            initializeYearSelect();
             generateCalendar();
         }
 
-        function backToInputForm() {
-            document.querySelector('.input-form').style.display = 'block';
-            document.querySelector('.calendar-view').style.display = 'none';
-            document.querySelector('.result-view').style.display = 'none';
-        }
-
-        function populateYearSelect() {
-            let yearSelect = document.getElementById('yearSelect');
-            let currentYear = new Date().getFullYear();
+        function initializeYearSelect() {
+            const yearSelect = document.getElementById('yearSelect');
+            const currentYear = new Date().getFullYear();
             yearSelect.innerHTML = '';
-            for (let i = -1; i <= 1; i++) {
-                let yearOption = document.createElement('option');
-                yearOption.value = currentYear + i;
-                yearOption.textContent = currentYear + i;
-                yearSelect.appendChild(yearOption);
+            for (let year = currentYear - 5; year <= currentYear + 5; year++) {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
             }
             yearSelect.value = currentYear;
         }
@@ -361,6 +391,13 @@
             document.getElementById('holidayBonusAmount').value = '';
             document.getElementById('yearSelect').value = new Date().getFullYear();
             document.getElementById('monthSelect').value = 0;
+        }
+
+        function endApp() {
+            document.querySelector('.input-form').style.display = 'none';
+            document.querySelector('.calendar-view').style.display = 'none';
+            document.querySelector('.result-view').style.display = 'none';
+            document.getElementById('exitMessage').style.display = 'block';
         }
     </script>
 </body>
